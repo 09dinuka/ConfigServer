@@ -1,0 +1,118 @@
+# parameter
+
+menusapi:
+  targetEnv: localhost
+  menusApiBaseUri: &menusApiBaseUri http://localhost.ifmsystems.com:8080/
+#  targetEnv: intdev
+#  menusApiBaseUri: &menusApiBaseUri https://alb.isotopesco.de/
+  env:
+    localhost:
+      sourceRegex: /api/web/(?<params>.*)
+      replaceRegex: /api-nextgen/services/$\{params}
+    intdev:
+      useRegex: false
+      sourceRegex:
+      replaceRegex:
+
+spring:
+  cloud:
+    gateway:
+      routes:
+# User service(switch to McS when it is ready)
+        - id: user
+          uri: *menusApiBaseUri
+          predicates:
+            - Path=/api/web/user/**
+          filters:
+            - MenusApiRewrite
+            - AddRequestHeader=accept, application/json
+# Datapak(point to intdev for now)
+        - id: datapak
+          uri: https://alb.isotopesco.de/
+          predicates:
+            - Path=/api/web/datapak/**
+          filters:
+            - RewritePath=/api/web/datapak/(?<params>.*), /services/menus-api/master/datapak/services/$\{params}
+            - AddRequestHeader=accept, application/json
+# Thin layer
+        - id: model
+          uri: *menusApiBaseUri
+          predicates:
+            - Path=/api/web/model/**
+          filters:
+            - MenusApiRewrite
+            - AddRequestHeader=accept, application/json
+            - name: Hystrix
+              args:
+                name: modelCmd
+                fallbackUri: forward:/fallback/server-error
+
+        - id: rate
+          uri: *menusApiBaseUri
+          predicates:
+            - Path=/api/web/rate/**
+          filters:
+            - MenusApiRewrite
+            - AddRequestHeader=accept, application/json
+            - name: Hystrix
+              args:
+                name: rateCmd
+                fallbackUri: forward:/fallback/server-error
+
+        - id: operation
+          uri: *menusApiBaseUri
+          predicates:
+            - Path=/api/web/operation*/**
+          filters:
+            - MenusApiRewrite
+            - AddRequestHeader=accept, application/json
+            - name: Hystrix
+              args:
+                name: operationCmd
+                fallbackUri: forward:/fallback/server-error
+
+        - id: recommendataion
+          uri: *menusApiBaseUri
+          predicates:
+            - Path=/api/web/recommendation/**
+          filters:
+            - MenusApiRewrite
+            - AddRequestHeader=accept, application/json
+            - name: Hystrix
+              args:
+                name: recommendataionCmd
+                fallbackUri: forward:/fallback/server-error
+
+        - id: defaultMenusApi
+          uri: *menusApiBaseUri
+          predicates:
+            - Path=/api/web/**
+          filters:
+            - MenusApiRewrite
+            - AddRequestHeader=accept, application/json
+            - name: Hystrix
+              args:
+                name: defaultMenusApiCmd
+                fallbackUri: forward:/fallback/server-error
+
+server:
+  port: 8095
+
+# Add endpoints to the actuator
+management.endpoints.web.exposure.include: gateway, health, DEBUG
+
+hystrix.command:
+  default:
+    # Default timeout
+    execution.isolation.thread.timeoutInMilliseconds: 5000
+  operationCmd:
+    execution.isolation.thread.timeoutInMilliseconds: 9000
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    com.netflix.hystrix: DEBUG
+    org.springframework.http.server.reactive: DEBUG
+    org.springframework.web.reactive: DEBUG
+    reactor.ipc.netty: DEBUG
+    reactor.netty: DEBUG
