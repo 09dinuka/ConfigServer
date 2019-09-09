@@ -104,7 +104,7 @@ management.endpoints.web.exposure.include: gateway, health, DEBUG, refresh
 hystrix.command:
   default:
     # Default timeout
-    execution.isolation.thread.timeoutInMilliseconds: 6000
+    execution.isolation.thread.timeoutInMilliseconds: 5000
   operationCmd:
     execution.isolation.thread.timeoutInMilliseconds: 9000
 
